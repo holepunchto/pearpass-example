@@ -1,0 +1,23 @@
+{
+  "name": "pearwords",
+  "version": "0.0.0",
+  "description": "Password Manager App",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holepunchto/pearwords.git"
+  },
+  "keywords": [
+    "password",
+    "manager"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/holepunchto/pearwords/issues"
+  },
+  "homepage": "https://github.com/holepunchto/pearwords#readme",
+  "dependencies": {
+    "autobase": "^6.5.6",
+    "corestore": "^6.18.4"
+  }
+}
