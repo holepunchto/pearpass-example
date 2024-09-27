@@ -2,10 +2,12 @@
 
 const Autobase = require('autobase')
 const Hyperbee = require('hyperbee')
+const Hyperswarm = require('hyperswarm')
 const b4a = require('b4a')
 
 class Pearwords {
   constructor (corestore, key) {
+    // Initialise the base
     this.base = new Autobase(corestore, key, {
       valueEncoding: 'json',
       open (store) {
@@ -23,29 +25,38 @@ class Pearwords {
           if (op.type === 'addWriter') {
             await base.addWriter(b4a.from(op.key, 'hex'))
             continue
-            // This is necessary for adding or removing data from the base
-          } else if (op.value) await view.put(op.key, op.value)
-          else await view.del(op.key)
+          } else if (op.type === 'addRecord') {
+            // This adds a new record
+            await view.put(op.key, op.value)
+          } else if (op.type === 'removeRecord') {
+            // Remove an existing record
+            await view.del(op.key)
+          }
         }
       }
     })
+
+    // Create new Hyperswarm to replicate
+    this.swarm = new Hyperswarm()
+  }
+
+  // Check if base is ready
+  ready () {
+    return this.base.ready()
+  }
+
+  // Close the base
+  close () {
+    return this.base.close()
   }
 
   // Need this key to become a writer
-  writableKey () {
+  writerKey () {
     return this.base.local.key
   }
 
-  // Add a peer as a writer
-  async addWriter (key) {
-    await this.base.append({
-      type: 'addWriter',
-      key
-    })
-  }
-
   // Return bootstrap key of the base
-  // This is what other peers should use to bootstrap the base
+  // This is what other peers should use to bootstrap the base from
   bootstrapKey () {
     return this.base.key
   }
@@ -68,9 +79,44 @@ class Pearwords {
     return node.value
   }
 
+  // Add a peer as a writer
+  async addWriter (key) {
+    await this.base.append({
+      type: 'addWriter',
+      key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
+    })
+  }
+
+  // Check if the base is writable
+  isWritable () {
+    return this.base.writable
+  }
+
+  // Start Replicating the base across peers
+  async replicate (key) {
+    let swarmTopic
+    if (key) {
+      swarmTopic = b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
+    } else {
+      swarmTopic = this.discoveryKey()
+    }
+
+    // Join over a common topic
+    const discovery = this.swarm.join(this.discoveryKey())
+    // Waits for the topic to be fully announced on the DHT
+    await discovery.flushed()
+    // Listen for connections
+    this.swarm.on('connection', (connection, peerInfo) => {
+      console.log('\rPeer joined: ', b4a.toString(peerInfo.publicKey, 'hex'))
+      // Replicate the base
+      this.base.replicate(connection)
+    })
+  }
+
   // Append a key/value to the base
   async add (key, value) {
     await this.base.append({
+      type: 'addRecord',
       key,
       value
     })
@@ -79,6 +125,7 @@ class Pearwords {
   // Remove a key pair
   async remove (key) {
     await this.base.append({
+      type: 'removeRecord',
       key,
       value: null
     })
