@@ -18,6 +18,8 @@ console.log(baseDir)
 // Initialise global variables here
 let pearwords
 
+/// // Function Definitions /////
+
 // Create an autobase if one does not exist already
 async function createBase () {
   // Don't create the base if already exists
@@ -93,7 +95,14 @@ async function createBase () {
 
   // Add bootstrap key
   setKey()
-
+  // Set the Add writer button
+  if (pearwords.isWritable() === true) {
+    document.querySelector('.add-writer').innerHTML = 'Add a Writer'
+    document.querySelector('.add-writer').removeAttribute('disabled')
+  } else {
+    document.querySelector('.add-writer').innerHTML = 'Copy Writer Key'
+    document.querySelector('.add-writer').setAttribute('disabled', '')
+  }
   await pearwords.replicate()
   console.log('Replication started')
 }
@@ -140,6 +149,12 @@ async function createTable () {
   }
 }
 
+async function copy (data) {
+  navigator.clipboard.writeText(data)
+}
+
+/// // Function Implementations /////
+
 // Call this to start base creation
 await createBase()
 
@@ -152,6 +167,8 @@ pearwords.base.view.core.on('append', (e) => {
 // Check for base writable state
 pearwords.base.on('writable', (e) => {
   console.log('I am writable')
+  document.querySelector('.add-writer').innerHTML = 'Add a Writer'
+  document.querySelector('.add-writer').removeAttribute('disabled')
 })
 
 // Create the initial table
@@ -177,17 +194,11 @@ document.querySelector('.destroy-session').addEventListener('click', (e) => {
 })
 
 // Copy Pearwords key to the clipboard
-document.querySelector('.session-link').addEventListener('click', (e) => {
+document.querySelector('.session-link').addEventListener('click', async (e) => {
   // Use the Clipboard API
-  navigator.clipboard
-    .writeText(b4a.toString(pearwords.bootstrapKey(), 'hex'))
-    .then(() => {
-      console.log('Key copied to clipboard')
-      alert('Key copied to clipboard!')
-    })
-    .catch((err) => {
-      console.error('Error copying string: ', err)
-    })
+  await copy(b4a.toString(pearwords.bootstrapKey(), 'hex'))
+  console.log('Key copied to clipboard')
+  alert('Key copied to clipboard!')
 })
 
 // Add data to the autobase
@@ -255,6 +266,10 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
 document.querySelector('.add-writer').addEventListener('click', async (e) => {
   // Check if the button is disabled
   if (e.target.hasAttribute('disabled')) {
+    copy(b4a.toString(pearwords.writerKey(), 'hex'))
+    alert(
+      'Writer key copied to clipboard, ask the admin to add your as a writer'
+    )
     return
   }
   // Add new writer pop-up
@@ -277,5 +292,3 @@ document.querySelector('.add-writer').addEventListener('click', async (e) => {
     }
   })
 })
-
-console.log(b4a.toString(pearwords.writerKey(), 'hex'))
