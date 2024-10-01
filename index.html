@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="css/app.css" />
+        <link rel="stylesheet" type="text/css" href="css/index.css" />
+        <script type="module" src="app.js"></script>
+    </head>
+    <body style="color: white">
+        <div id="bar">
+            <pear-ctrl></pear-ctrl>
+            <div class="password-notes-buttons">
+                <button>Password</button>
+                <button>Secure Notes</button>
+            </div>
+        </div>
+        <div
+            class="button-bar"
+            style="width: 80%; right: auto; height: 12px"
+        ></div>
+
+        <div class="container">
+            <div class="left-panel">
+                <div class="session-info">
+                    <h2>Pearwords 🍐</h2>
+                    <img src="assets/pear-vault.png" class="pear-vault-image" />
+                    <div class="session-link">
+                        <p>Loading...</p>
+                        <img src="assets/copy-icon.svg" />
+                    </div>
+                    <div class="button add-data">Add Data</div>
+                    <div class="button add-writer">Add a Writer</div>
+                    <div class="button destroy-session">Destroy Vault</div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="password-table">
+                    <img src="./assets/connectivity.png" class="connectivity" />
+                    <table id="passwordTable">
+                        <tr>
+                            <th>Username</th>
+                            <th>Password</th>
+                            <th>Website</th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
