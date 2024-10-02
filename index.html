@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="css/app.css" />
+        <link rel="stylesheet" type="text/css" href="css/index.css" />
+        <script type="module" src="app.js"></script>
+    </head>
+    <body style="color: white">
+        <div id="bar">
+            <pear-ctrl></pear-ctrl>
+            <div class="password-notes-buttons">
+                <button class="tablinks" onclick="openView(event, 'Password')">
+                    Password
+                </button>
+                <button class="tablinks" onclick="openView(event, 'Notes')">
+                    Secure Notes
+                </button>
+            </div>
+        </div>
+        <div
+            class="button-bar"
+            style="width: 80%; right: auto; height: 12px"
+        ></div>
+
+        <div class="container">
+            <div class="left-panel">
+                <div class="session-info">
+                    <h2>Pearwords 🍐</h2>
+                    <img src="assets/pear-vault.png" class="pear-vault-image" />
+                    <div class="session-link">
+                        <p>Loading...</p>
+                        <img src="assets/copy-icon.svg" />
+                    </div>
+                    <div class="button add-data">Add Data</div>
+                    <div class="button add-writer" disabled>Add a Writer</div>
+                    <div class="button destroy-session">Destroy Vault</div>
+                </div>
+            </div>
+            <div class="right-panel">
+                <div class="password-table">
+                    <img src="./assets/connectivity.png" class="connectivity" />
+                    <div
+                        id="Password"
+                        style="display: block"
+                        class="tabcontent"
+                    >
+                        <table id="passwordTable">
+                            <tr>
+                                <th>Username</th>
+                                <th>Password</th>
+                                <th>Website</th>
+                            </tr>
+                        </table>
+                    </div>
+                    <div id="Notes" class="tabcontent">
+                        <table id="notesTable">
+                            <tr class="notes-header">
+                                <th>Notes</th>
+                            </tr>
+                            <tr>
+                                <td>Test note</td>
+                            </tr>
+                            <tr>
+                                <td>Test note</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function openView(evt, tabName) {
+                var i, tabcontent, tablinks;
+                tabcontent = document.getElementsByClassName("tabcontent");
+                for (i = 0; i < tabcontent.length; i++) {
+                    tabcontent[i].style.display = "none";
+                }
+                tablinks = document.getElementsByClassName("tablinks");
+                for (i = 0; i < tablinks.length; i++) {
+                    tablinks[i].className = tablinks[i].className.replace(
+                        " active",
+                        "",
+                    );
+                }
+                document.getElementById(tabName).style.display = "block";
+                evt.currentTarget.className += " active";
+            }
+        </script>
+    </body>
+</html>

@@ -1,0 +1,187 @@
+body {
+    background-color: #1a1b1f;
+    font-family: Arial, sans-serif;
+    color: white;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    display: flex;
+}
+
+.left-panel {
+    height: 100vh;
+    width: 30%;
+    padding: 20px;
+    background-color: #212126;
+}
+
+.right-panel {
+    width: 70%;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    align-items: flex-start;
+}
+
+.right-panel .receiving-files {
+    text-align: center;
+}
+
+.pear-img {
+    width: 100px;
+    margin: 20px 0;
+}
+
+.session-info {
+    text-align: center;
+}
+
+.session-info h2 {
+    margin: 10px 0;
+    font-size: 22px;
+}
+
+.session-info p {
+    margin: 5px 0;
+    font-size: 18px;
+}
+
+.button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 10px 0;
+    cursor: pointer;
+}
+
+.destroy-session {
+    background-color: red;
+}
+
+.session-link {
+    cursor: pointer;
+    display: flex;
+    max-width: -webkit-fill-available;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    padding: 10px;
+    background-color: #34343a;
+    color: #b9b9b9;
+    border: none;
+    border-radius: 5px;
+    text-align: center;
+}
+
+.session-link:active {
+    border: 2px solid;
+}
+
+.session-link > p {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 90%;
+}
+
+.session-link > img {
+    width: 25px;
+}
+
+.password-table {
+    width: 80%;
+    text-align: -webkit-center;
+}
+
+.password-table h2 {
+    font-size: 24px;
+}
+
+.connectivity {
+    width: 400px;
+    height: 400px;
+    margin-bottom: 20px;
+    -webkit-user-drag: none;
+    user-select: none;
+    opacity: 0.2;
+    z-index: -99;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.pear-vault-image {
+    max-width: -webkit-fill-available;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.password-notes-buttons {
+    position: absolute;
+    -webkit-app-region: no-drag;
+    right: 20px;
+    top: 0;
+    margin: 5px;
+}
+
+.password-notes-buttons button {
+    background-color: #ff6600;
+    color: white;
+    padding: 9px;
+    margin: 0 5px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.status-icon {
+    position: absolute;
+    top: 20px;
+    right: 60px;
+}
+
+table {
+    border-spacing: 20px;
+    width: -webkit-fill-available;
+}
+
+th {
+    user-select: none;
+    background-color: #2d476e;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+td {
+    text-align: center;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 50px;
+}
+
+.tabcontent {
+    display: none;
+}
+
+.notes-header {
+    user-select: none;
+    background-color: #2d476e;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+#notesTable > tbody > tr > td {
+    text-align: justify;
+    background-color: #828c9b;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+.notes {
+    width: -webkit-fill-available;
+}

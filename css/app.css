@@ -1,0 +1,45 @@
+body > h1:nth-of-type(1) {
+    cursor: pointer;
+}
+
+body {
+    --title-bar-height: 42px;
+    padding-top: var(--title-bar-height);
+    overflow: hidden;
+}
+
+#bar {
+    background: rgba(55, 60, 72, 0.6);
+    backdrop-filter: blur(64px);
+    -webkit-app-region: drag;
+    height: var(--title-bar-height);
+    padding: 0;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    color: #fff;
+    white-space: nowrap;
+    box-sizing: border-box;
+    position: fixed;
+    z-index: 2;
+    width: 100%;
+    left: 0;
+    top: 0;
+}
+
+.button-bar {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 0 0;
+    cursor: pointer;
+    z-index: -999;
+}
+
+pear-ctrl[data-platform="darwin"] {
+    margin-top: 18px;
+    margin-left: 12px;
+}

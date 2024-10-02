@@ -2,7 +2,18 @@
   "name": "pearwords",
   "version": "0.0.0",
   "description": "Password Manager App",
-  "main": "index.js",
+  "pear": {
+    "name": "pearwords",
+    "type": "desktop",
+    "gui": {
+      "backgroundColor": "#1b1d29",
+      "height": 808,
+      "width": 1220,
+      "resizable": false
+    }
+  },
+  "type": "module",
+  "main": "index.html",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/holepunchto/pearwords.git"
@@ -12,7 +23,9 @@
     "manager"
   ],
   "scripts": {
-    "test": "standard"
+    "dev": "pear run -d .",
+    "test": "brittle test/*.test.js",
+    "fix": "standard --fix"
   },
   "license": "Apache-2.0",
   "bugs": {
@@ -22,10 +35,14 @@
   "dependencies": {
     "autobase": "^6.5.6",
     "b4a": "^1.6.7",
+    "bare-fs": "^3.0.2",
     "corestore": "^6.18.4",
-    "hyperswarm": "^4.8.2"
+    "hyperswarm": "^4.8.2",
+    "sweetalert2": "^11.14.1"
   },
   "devDependencies": {
+    "brittle": "^3.0.0",
+    "pear-interface": "^1.0.0",
     "standard": "^17.1.2"
   }
 }

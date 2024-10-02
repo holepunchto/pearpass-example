@@ -1,12 +1,13 @@
 // the js module powering the mobile and desktop app
 
-const Autobase = require('autobase')
-const Hyperbee = require('hyperbee')
-const Hyperswarm = require('hyperswarm')
-const b4a = require('b4a')
+import Autobase from 'autobase'
+import Hyperbee from 'hyperbee'
+import Hyperswarm from 'hyperswarm'
+import b4a from 'b4a'
 
 class Pearwords {
   constructor (corestore, key) {
+    this.corestore = corestore
     // Initialise the base
     this.base = new Autobase(corestore, key, {
       valueEncoding: 'json',
@@ -24,7 +25,6 @@ class Pearwords {
           // Add support for adding other peers as a writer to the base
           if (op.type === 'addWriter') {
             await base.addWriter(b4a.from(op.key, 'hex'))
-            continue
           } else if (op.type === 'addRecord') {
             // This adds a new record
             await view.put(op.key, op.value)
@@ -37,17 +37,20 @@ class Pearwords {
     })
 
     // Create new Hyperswarm to replicate
-    this.swarm = new Hyperswarm()
+    this.swarm = null
   }
 
   // Check if base is ready
-  ready () {
+  async ready () {
     return this.base.ready()
   }
 
   // Close the base
-  close () {
-    return this.base.close()
+  async close () {
+    if (this.swarm) {
+      await this.swarm.destroy()
+    }
+    await this.base.close()
   }
 
   // Need this key to become a writer
@@ -81,11 +84,20 @@ class Pearwords {
 
   // Add a peer as a writer
   async addWriter (key) {
-    await this.base.append({
-      type: 'addWriter',
-      key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
-    })
+    try {
+      await this.base.append({
+        type: 'addWriter',
+        key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
+      })
+    } catch (error) {
+      throw error
+    }
+
+    return true
   }
+
+  // To later add removeWriter
+  async removeWriter (key) {}
 
   // Check if the base is writable
   isWritable () {
@@ -93,21 +105,16 @@ class Pearwords {
   }
 
   // Start Replicating the base across peers
-  async replicate (key) {
-    let swarmTopic
-    if (key) {
-      swarmTopic = b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
-    } else {
-      swarmTopic = this.discoveryKey()
-    }
-
-    // Join over a common topic
+  async replicate () {
+    await this.ready()
+    this.swarm = new Hyperswarm({
+      keyPair: await this.corestore.createKeyPair('hyperswarm')
+    })
+    // Join swarm over discovery key
     const discovery = this.swarm.join(this.discoveryKey())
-    // Waits for the topic to be fully announced on the DHT
-    await discovery.flushed()
+
     // Listen for connections
     this.swarm.on('connection', (connection, peerInfo) => {
-      console.log('\rPeer joined: ', b4a.toString(peerInfo.publicKey, 'hex'))
       // Replicate the base
       this.base.replicate(connection)
     })
@@ -132,4 +139,5 @@ class Pearwords {
   }
 }
 
-module.exports = Pearwords
+// module.exports = Pearwords;
+export default Pearwords
