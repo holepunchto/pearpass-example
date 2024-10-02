@@ -59,18 +59,6 @@ body {
     cursor: pointer;
 }
 
-.button-bar {
-    display: inline-block;
-    background-color: #007bff;
-    color: white;
-    padding: 10px 15px;
-    text-align: center;
-    border-radius: 5px;
-    text-decoration: none;
-    margin: 0 0;
-    cursor: pointer;
-}
-
 .destroy-session {
     background-color: red;
 }
@@ -135,6 +123,7 @@ body {
 
 .password-notes-buttons {
     position: absolute;
+    -webkit-app-region: no-drag;
     right: 20px;
     top: 0;
     margin: 5px;
@@ -173,4 +162,26 @@ td {
     text-overflow: ellipsis;
     overflow: hidden;
     max-width: 50px;
+}
+
+.tabcontent {
+    display: none;
+}
+
+.notes-header {
+    user-select: none;
+    background-color: #2d476e;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+#notesTable > tbody > tr > td {
+    text-align: justify;
+    background-color: #828c9b;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+.notes {
+    width: -webkit-fill-available;
 }

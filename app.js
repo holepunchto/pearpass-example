@@ -115,29 +115,48 @@ function setKey () {
 }
 
 // Push data to the html table
-function push (username, password, website) {
-  // Get the table by its ID
-  const table = document.getElementById('passwordTable')
+function push (type, data) {
+  if (type === 'password') {
+    // Get the table by its ID
+    const table = document.getElementById('passwordTable')
 
-  // Create a new row and its cells
-  const newRow = table.insertRow()
-  const usernameCell = newRow.insertCell(0)
-  const passwordCell = newRow.insertCell(1)
-  const websiteCell = newRow.insertCell(2)
+    // Create a new row and its cells
+    const newRow = table.insertRow()
+    const usernameCell = newRow.insertCell(0)
+    const passwordCell = newRow.insertCell(1)
+    const websiteCell = newRow.insertCell(2)
 
-  // Assign the values to the cells
-  usernameCell.textContent = username
-  passwordCell.textContent = password
-  websiteCell.textContent = website
+    // Assign the values to the cells
+    usernameCell.textContent = data.username
+    passwordCell.textContent = data.password
+    websiteCell.textContent = data.website
+  } else if (type === 'note') {
+    // Get the table by its ID
+    const table = document.getElementById('notesTable')
+
+    // Create a new row and its cells
+    const newRow = table.insertRow()
+    const titleCell = newRow.insertCell(0)
+    const noteCell = newRow.insertCell(1)
+
+    // Assign the values to the cells
+    titleCell.textContent = data.title
+    noteCell.textContent = data.note
+  }
 }
 
 // Clean the table of all records, will be used for re-rendering
 function cleanTable () {
-  const table = document.getElementById('passwordTable')
+  const passwordTable = document.getElementById('passwordTable')
+  const notesTable = document.getElementById('notesTable')
 
   // Remove all rows except the header (first row)
-  while (table.rows.length > 1) {
-    table.deleteRow(1) // Keep deleting the second row until only the header remains
+  while (passwordTable.rows.length > 1) {
+    passwordTable.deleteRow(1) // Keep deleting the second row until only the header remains
+  }
+
+  while (notesTable.rows.length > 1) {
+    notesTable.deleteRow(1) // Keep deleting the second row until only the header remains
   }
 }
 
@@ -145,7 +164,15 @@ function cleanTable () {
 async function createTable () {
   cleanTable()
   for await (const data of pearwords.list()) {
-    push(data.value[0], data.value[1], data.value[2])
+    if (data.value[0] === 'password') {
+      push(data.value[0], {
+        username: data.value[1],
+        password: data.value[2],
+        website: data.value[3]
+      })
+    } else if (data.value[0] === 'note') {
+      push(data.value[0], { title: data.value[1], note: data.value[2] })
+    }
   }
 }
 
@@ -160,7 +187,6 @@ await createBase()
 
 // Listen and add new passwords to the list
 pearwords.base.view.core.on('append', (e) => {
-  console.log('exexex')
   createTable()
 })
 
@@ -246,6 +272,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         preConfirm: () => {
           // Return input from these fields
           return [
+            'password',
             document.getElementById('swal-username').value,
             document.getElementById('swal-password').value,
             document.getElementById('swal-website').value
@@ -253,11 +280,32 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         }
       })
       if (formValues) {
-        await pearwords.add(formValues[0], formValues)
+        await pearwords.add(formValues[1], formValues)
         createTable()
       }
     } else {
-      Swal.fire('You selected a note')
+      // Pop up for adding a Note
+      const { value: formValues } = await Swal.fire({
+        title: 'New Note',
+        html: `
+        <input id="swal-noteTitle" class="swal2-input notes" placeholder="Note Title" >
+        <input id="swal-note" class="swal2-input notes" placeholder="Note" >
+
+        `,
+        focusConfirm: false,
+        preConfirm: () => {
+          // Return input from these fields
+          return [
+            'note',
+            document.getElementById('swal-noteTitle').value,
+            document.getElementById('swal-note').value
+          ]
+        }
+      })
+      if (formValues) {
+        await pearwords.add(formValues[1], formValues)
+        createTable()
+      }
     }
   }
 })

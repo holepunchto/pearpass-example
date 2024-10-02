@@ -26,6 +26,19 @@ body {
     top: 0;
 }
 
+.button-bar {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    text-align: center;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 0 0;
+    cursor: pointer;
+    z-index: -999;
+}
+
 pear-ctrl[data-platform="darwin"] {
     margin-top: 18px;
     margin-left: 12px;
