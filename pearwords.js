@@ -115,7 +115,6 @@ class Pearwords {
 
     // Listen for connections
     this.swarm.on('connection', (connection, peerInfo) => {
-      console.log('\rPeer joined: ', b4a.toString(peerInfo.publicKey, 'hex'))
       // Replicate the base
       this.base.replicate(connection)
     })
@@ -128,8 +127,6 @@ class Pearwords {
       key,
       value
     })
-
-    console.log('Data added')
   }
 
   // Remove a key pair
