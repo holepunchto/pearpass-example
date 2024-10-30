@@ -1,30 +1,41 @@
 // Design API for pear processes here
 /** @typedef {import('pear-interface')} */ /* global Pear */
 
-// This live reloads the app during development
 // Import necessary modules
 import Corestore from 'corestore'
+import Hyperswarm from 'hyperswarm'
 import Pearwords from './pearwords.js'
+import ProtomuxRPC from 'protomux-rpc'
+import libKeys from 'hyper-cmd-lib-keys'
 import b4a from 'b4a'
 import fs from 'fs'
 // For pop-ups
 import Swal from 'sweetalert2'
-Pear.updates(() => Pear.reload())
-Pear.teardown(() => pearwords.close())
+
+// Pear.updates(() => Pear.reload())
+Pear.teardown(() => pearwords._close())
 
 // Path to store autobase
 const baseDir = Pear.config.storage + '/store'
-console.log(baseDir)
+
 // Initialise global variables here
 let pearwords
+let coreStore
+let discoveryKey
 
-/// // Function Definitions /////
+/// // Function Definitions // ///
+
+async function initCoreStore () {
+  coreStore = new Corestore(baseDir)
+}
 
 // Create an autobase if one does not exist already
 async function createBase () {
+  let bootstrapKey = null
   // Don't create the base if already exists
   if (fs.existsSync(baseDir)) {
-    pearwords = new Pearwords(new Corestore(baseDir))
+    initCoreStore()
+    pearwords = new Pearwords(coreStore)
     console.log('Base exists')
   } else {
     console.log('Base does not exist, prompt user to create a new one')
@@ -43,13 +54,15 @@ async function createBase () {
       allowOutsideClick: false
     })
 
+    // Logic for creating a new vault
     if (result.isConfirmed) {
-      // Logic for creating a new vault
-      pearwords = new Pearwords(new Corestore(baseDir))
+      initCoreStore()
+      pearwords = new Pearwords(coreStore)
       await Swal.fire('New vault created!', '', 'success')
       createTable()
     } else if (result.isDenied) {
       // Load an existing vault
+      await initCoreStore()
       const vaultKeyResult = await Swal.fire({
         title: 'Enter Your Vault Key',
         input: 'text',
@@ -64,14 +77,59 @@ async function createBase () {
         showCancelButton: true,
         confirmButtonText: 'Create',
         showLoaderOnConfirm: true,
-        inputValidator: (value) => {
+        inputValidator: async (value) => {
+          // Combined key length with secret + discovery key is 128 characters
           if (!value) {
             return 'Key can not be blank!'
+          } else if (value.length !== 128) {
+            return 'Key is not of proper length'
+          }
+          // Load a temporary Hyperswarm
+          const swarm = new Hyperswarm({
+            keyPair: await coreStore.createKeyPair('hyperswarm')
+          })
+
+          // Join swarm over discovery key
+          const key = Buffer.from(value.slice(-64), 'hex')
+          const discovery = swarm.join(key)
+
+          // Create a promise that resolves when a connection is established
+          const connectionPromise = new Promise((resolve, reject) => {
+            swarm.on('connection', async (connection, peerInfo) => {
+              console.log('Joined swarm')
+              const rpc = new ProtomuxRPC(connection)
+              // Key of the corestore
+              const coreKey = await Pearwords.coreKey(coreStore)
+              // Secret key from the pairing key
+              const secretKey = Buffer.from(value.slice(0, 64), 'hex')
+              console.log('Requesting to pair')
+              const writerReq = await rpc.request(
+                'addMe',
+                Buffer.concat([secretKey, coreKey])
+              )
+              console.log('RPC requested')
+              if (writerReq) {
+                // Store RPC answer
+                bootstrapKey = writerReq
+                resolve(writerReq) // Resolve the promise with the writer request
+              } else {
+                reject('Unable to pair') // Reject the promise if verification fails
+              }
+            })
+          })
+
+          // Wait for the connection promise to resolve or reject
+          try {
+            await connectionPromise
+          } catch (error) {
+            return error // Return the error if the promise was rejected
           }
         },
+
         preConfirm: async (vaultKey) => {
+          // Initialise Pearwords
           try {
-            pearwords = new Pearwords(new Corestore(baseDir), vaultKey)
+            pearwords = new Pearwords(coreStore, bootstrapKey)
           } catch (error) {
             Swal.showValidationMessage(`Error: ${error}`)
           }
@@ -81,7 +139,7 @@ async function createBase () {
 
       if (vaultKeyResult.isConfirmed) {
         await Swal.fire('Loaded an existing vault', '', 'info')
-        createTable()
+        await createTable()
       } else {
         // An empty store folder is created due to failure, delete it and start over
         fs.rmSync(baseDir, { recursive: true, force: true })
@@ -90,9 +148,14 @@ async function createBase () {
     }
   }
 
+  // Wait for pearwords to get ready
   await pearwords.ready()
+  // Set pairable state to false
+  pearwords.pairable = false
   console.log('Ready to use pearwords')
-
+  // Begin replicating to/from
+  await pearwords.replicate()
+  // Todo: Marked for removal
   // Add bootstrap key
   setKey()
   // Set the Add writer button
@@ -103,10 +166,11 @@ async function createBase () {
     document.querySelector('.add-writer').innerHTML = 'Copy Writer Key'
     document.querySelector('.add-writer').setAttribute('disabled', '')
   }
-  await pearwords.replicate()
+  discoveryKey = b4a.toString(await pearwords.discoveryKey(), 'hex')
   console.log('Replication started')
 }
 
+// Todo: Marking for Removal, it is now obsolete
 function setKey () {
   document.querySelector('.session-link > p').innerHTML = b4a.toString(
     pearwords.bootstrapKey(),
@@ -174,10 +238,17 @@ async function createTable () {
       push(data.value[0], { title: data.value[1], note: data.value[2] })
     }
   }
+  console.log('Created table')
 }
 
+// Copy data to clipboard
 async function copy (data) {
   navigator.clipboard.writeText(data)
+}
+
+// Generate Random 32 bytes
+function randomBytes () {
+  return libKeys.randomBytes(32).toString('hex')
 }
 
 /// // Function Implementations /////
@@ -185,11 +256,18 @@ async function copy (data) {
 // Call this to start base creation
 await createBase()
 
+// Create table when base first loads
+pearwords.base.view.core.on('ready', (e) => {
+  console.log('Base is readyyyy')
+  createTable()
+})
+
 // Listen and add new passwords to the list
 pearwords.base.view.core.on('append', (e) => {
   createTable()
 })
 
+// Todo: Marking for removal
 // Check for base writable state
 pearwords.base.on('writable', (e) => {
   console.log('I am writable')
@@ -198,9 +276,9 @@ pearwords.base.on('writable', (e) => {
 })
 
 // Create the initial table
-createTable()
+await createTable()
 
-// Destroy the base
+// Logic for destroying the base
 document.querySelector('.destroy-session').addEventListener('click', (e) => {
   if (
     confirm(
@@ -219,6 +297,7 @@ document.querySelector('.destroy-session').addEventListener('click', (e) => {
   }
 })
 
+// Todo: Marking for removal
 // Copy Pearwords key to the clipboard
 document.querySelector('.session-link').addEventListener('click', async (e) => {
   // Use the Clipboard API
@@ -310,6 +389,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
   }
 })
 
+// Todo: Marking for removal
 // Handle the add writer function
 document.querySelector('.add-writer').addEventListener('click', async (e) => {
   // Check if the button is disabled
@@ -337,6 +417,52 @@ document.querySelector('.add-writer').addEventListener('click', async (e) => {
       } catch (error) {
         Swal.showValidationMessage(`Error: ${error}`)
       }
+    }
+  })
+})
+
+// Pair button setup
+document.getElementById('pair-button').addEventListener('click', async (e) => {
+  let timerInterval
+  Swal.fire({
+    title: 'Pairing is now on',
+    html: ' Remaining time <b></b> seconds.<div class="session-link"><p class="pair-discovery-key"> </p> <img src="assets/copy-icon.svg" /> </div> <b> </b>',
+    timer: 120000,
+    timerProgressBar: true,
+    didOpen: async () => {
+      Swal.showLoading()
+      // Enable pairing
+      pearwords.pairable = randomBytes()
+      console.log('pariable: ', pearwords.pairable)
+      console.log('pariable: ', pearwords.pairable)
+      // Copy Pearwords key to the clipboard
+      Swal.getPopup()
+        .querySelector('.pair-discovery-key')
+        .addEventListener('click', async (e) => {
+          // Use the Clipboard API
+          await copy(pearwords.pairable + discoveryKey)
+          alert('Pairing key copied!')
+        })
+
+      const discovery = Swal.getPopup().querySelector('.session-link > p')
+      discovery.textContent = pearwords.pairable + discoveryKey
+      const timer = Swal.getPopup().querySelector('b')
+      timerInterval = setInterval(() => {
+        timer.textContent = `${Swal.getTimerLeft() / 1000}`
+      }, 100)
+      console.log(pearwords.pairable)
+    },
+    willClose: () => {
+      // Pairing Session Ended by Closing Pop up
+      pearwords.pairable = false
+      clearInterval(timerInterval)
+      console.log('Pairing session ended by user')
+    }
+  }).then((result) => {
+    // Pairing closed by timer
+    if (result.dismiss === Swal.DismissReason.timer) {
+      pearwords.pairable = false
+      console.log('Pairing session ended by Timer')
     }
   })
 })

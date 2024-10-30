@@ -185,3 +185,9 @@ td {
 .notes {
     width: -webkit-fill-available;
 }
+
+.pair-discovery-key {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

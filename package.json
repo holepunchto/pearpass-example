@@ -8,8 +8,7 @@
     "gui": {
       "backgroundColor": "#1b1d29",
       "height": 808,
-      "width": 1220,
-      "resizable": false
+      "width": 1220
     }
   },
   "type": "module",
@@ -24,6 +23,7 @@
   ],
   "scripts": {
     "dev": "pear run -d .",
+    "dev2": "pear run -s /Users/supersu/test -d .",
     "test": "brittle test/*.test.js",
     "fix": "standard --fix"
   },
@@ -37,7 +37,10 @@
     "b4a": "^1.6.7",
     "bare-fs": "^3.0.2",
     "corestore": "^6.18.4",
+    "hyper-cmd-lib-keys": "^0.1.1",
     "hyperswarm": "^4.8.2",
+    "protomux-rpc": "^1.6.0",
+    "ready-resource": "^1.1.1",
     "sweetalert2": "^11.14.1"
   },
   "devDependencies": {

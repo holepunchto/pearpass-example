@@ -3,11 +3,21 @@
 import Autobase from 'autobase'
 import Hyperbee from 'hyperbee'
 import Hyperswarm from 'hyperswarm'
+import ReadyResource from 'ready-resource'
+import ProtomuxRPC from 'protomux-rpc'
+
 import b4a from 'b4a'
 
-class Pearwords {
+class Pearwords extends ReadyResource {
   constructor (corestore, key) {
+    super()
     this.corestore = corestore
+    // Create new Hyperswarm to replicate
+    this.swarm = null
+    // Initialise a RPC to it later
+    this.rpc = null
+    // Set pairable to false
+    this.pairable = false
     // Initialise the base
     this.base = new Autobase(corestore, key, {
       valueEncoding: 'json',
@@ -35,9 +45,6 @@ class Pearwords {
         }
       }
     })
-
-    // Create new Hyperswarm to replicate
-    this.swarm = null
   }
 
   // Check if base is ready
@@ -46,7 +53,7 @@ class Pearwords {
   }
 
   // Close the base
-  async close () {
+  async _close () {
     if (this.swarm) {
       await this.swarm.destroy()
     }
@@ -58,14 +65,22 @@ class Pearwords {
     return this.base.local.key
   }
 
+  // A static method to return the key of the local corestore
+  static async coreKey (store) {
+    const core = Autobase.getLocalCore(store)
+    await core.ready()
+    const key = core.key
+    await core.close()
+    return key
+  }
+
   // Return bootstrap key of the base
   // This is what other peers should use to bootstrap the base from
   bootstrapKey () {
     return this.base.key
   }
 
-  // This is used for hyperswarm join and discovery
-  // Needed to replicate base across peers
+  // Find peers in Hyperswarm using this
   discoveryKey () {
     return this.base.discoveryKey
   }
@@ -114,9 +129,33 @@ class Pearwords {
     const discovery = this.swarm.join(this.discoveryKey())
 
     // Listen for connections
-    this.swarm.on('connection', (connection, peerInfo) => {
+    this.swarm.on('connection', async (connection, peerInfo) => {
+      console.log('Received connection')
       // Replicate the base
       this.base.replicate(connection)
+      // Setup a RPC on this connection
+      this.rpc = new ProtomuxRPC(connection)
+
+      // Handle pairing
+      this.rpc.respond('addMe', (req) => {
+        console.log('Received a verification request')
+        // First 64 characters are randomly generated secret key, set in this.pairable
+        // Latter 64 characters are coreKey of the remote base that we need to add as a writer
+        const pairingSecret = b4a.toString(req, 'hex').slice(0, 64)
+        const remoteKey = b4a.toString(req, 'hex').slice(-64)
+        // Go for verification only if pairing is enabled
+        console.log('Verifying peer')
+        if (this.pairable !== false && this.pairable === pairingSecret) {
+          try {
+            this.addWriter(remoteKey)
+          } catch (e) {
+            console.log('Error adding writer:', e)
+          }
+          return Buffer.from(this.bootstrapKey())
+        } else {
+          console.log('Pairing not enabled')
+        }
+      })
     })
   }
 
