@@ -257,8 +257,7 @@ function randomBytes () {
 await createBase()
 
 // Create table when base first loads
-pearwords.base.view.core.on('ready', (e) => {
-  console.log('Base is readyyyy')
+pearwords.base.on('update', (e) => {
   createTable()
 })
 
