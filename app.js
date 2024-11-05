@@ -32,10 +32,11 @@ async function initCoreStore () {
 // Create an autobase if one does not exist already
 async function createBase () {
   let bootstrapKey = null
+  let remoteEncryptionKey = null
   // Don't create the base if already exists
   if (fs.existsSync(baseDir)) {
     initCoreStore()
-    pearwords = new Pearwords(coreStore)
+    pearwords = new Pearwords({ coreStore: coreStore })
     console.log('Base exists')
   } else {
     console.log('Base does not exist, prompt user to create a new one')
@@ -57,7 +58,7 @@ async function createBase () {
     // Logic for creating a new vault
     if (result.isConfirmed) {
       initCoreStore()
-      pearwords = new Pearwords(coreStore)
+      pearwords = new Pearwords({ coreStore: coreStore, encryptionKey: randomBytes() })
       await Swal.fire('New vault created!', '', 'success')
       createTable()
     } else if (result.isDenied) {
@@ -103,14 +104,16 @@ async function createBase () {
               // Secret key from the pairing key
               const secretKey = Buffer.from(value.slice(0, 64), 'hex')
               console.log('Requesting to pair')
-              const writerReq = await rpc.request(
+              let writerReq = await rpc.request(
                 'addMe',
                 Buffer.concat([secretKey, coreKey])
               )
               console.log('RPC requested')
               if (writerReq) {
+                writerReq = b4a.toString(writerReq, 'hex')
                 // Store RPC answer
-                bootstrapKey = writerReq
+                bootstrapKey = writerReq.substring(0, 64)
+                remoteEncryptionKey = writerReq.substring(64)
                 resolve(writerReq) // Resolve the promise with the writer request
               } else {
                 reject('Unable to pair') // Reject the promise if verification fails
@@ -129,7 +132,7 @@ async function createBase () {
         preConfirm: async (vaultKey) => {
           // Initialise Pearwords
           try {
-            pearwords = new Pearwords(coreStore, bootstrapKey)
+            pearwords = new Pearwords({ coreStore: coreStore, bootstrapKey: bootstrapKey, encryptionKey: remoteEncryptionKey })
           } catch (error) {
             Swal.showValidationMessage(`Error: ${error}`)
           }
@@ -155,27 +158,14 @@ async function createBase () {
   console.log('Ready to use pearwords')
   // Begin replicating to/from
   await pearwords.replicate()
-  // Todo: Marked for removal
-  // Add bootstrap key
-  setKey()
   // Set the Add writer button
   if (pearwords.isWritable() === true) {
-    document.querySelector('.add-writer').innerHTML = 'Add a Writer'
-    document.querySelector('.add-writer').removeAttribute('disabled')
+    document.querySelector('.add-writer').innerHTML = 'Writable'
   } else {
-    document.querySelector('.add-writer').innerHTML = 'Copy Writer Key'
-    document.querySelector('.add-writer').setAttribute('disabled', '')
+    document.querySelector('.add-writer').innerHTML = 'Syncing..'
   }
   discoveryKey = b4a.toString(await pearwords.discoveryKey(), 'hex')
   console.log('Replication started')
-}
-
-// Todo: Marking for Removal, it is now obsolete
-function setKey () {
-  document.querySelector('.session-link > p').innerHTML = b4a.toString(
-    pearwords.bootstrapKey(),
-    'hex'
-  )
 }
 
 // Push data to the html table
@@ -266,11 +256,10 @@ pearwords.base.view.core.on('append', (e) => {
   createTable()
 })
 
-// Todo: Marking for removal
 // Check for base writable state
 pearwords.base.on('writable', (e) => {
   console.log('I am writable')
-  document.querySelector('.add-writer').innerHTML = 'Add a Writer'
+  document.querySelector('.add-writer').innerHTML = 'Writable'
   document.querySelector('.add-writer').removeAttribute('disabled')
 })
 
@@ -294,15 +283,6 @@ document.querySelector('.destroy-session').addEventListener('click', (e) => {
   } else {
     console.log('Destroy dialogue cancelled')
   }
-})
-
-// Todo: Marking for removal
-// Copy Pearwords key to the clipboard
-document.querySelector('.session-link').addEventListener('click', async (e) => {
-  // Use the Clipboard API
-  await copy(b4a.toString(pearwords.bootstrapKey(), 'hex'))
-  console.log('Key copied to clipboard')
-  alert('Key copied to clipboard!')
 })
 
 // Add data to the autobase
@@ -388,38 +368,6 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
   }
 })
 
-// Todo: Marking for removal
-// Handle the add writer function
-document.querySelector('.add-writer').addEventListener('click', async (e) => {
-  // Check if the button is disabled
-  if (e.target.hasAttribute('disabled')) {
-    copy(b4a.toString(pearwords.writerKey(), 'hex'))
-    alert(
-      'Writer key copied to clipboard, ask the admin to add your as a writer'
-    )
-    return
-  }
-  // Add new writer pop-up
-  await Swal.fire({
-    title: 'Add a writer',
-    input: 'text',
-    showCancelButton: true,
-    inputValidator: (key) => {
-      if (!key) {
-        return 'You need to add a key'
-      }
-    },
-    preConfirm: async (key) => {
-      try {
-        await pearwords.addWriter(key)
-        Swal.fire('Added a new writer')
-      } catch (error) {
-        Swal.showValidationMessage(`Error: ${error}`)
-      }
-    }
-  })
-})
-
 // Pair button setup
 document.getElementById('pair-button').addEventListener('click', async (e) => {
   let timerInterval
@@ -432,8 +380,6 @@ document.getElementById('pair-button').addEventListener('click', async (e) => {
       Swal.showLoading()
       // Enable pairing
       pearwords.pairable = randomBytes()
-      console.log('pariable: ', pearwords.pairable)
-      console.log('pariable: ', pearwords.pairable)
       // Copy Pearwords key to the clipboard
       Swal.getPopup()
         .querySelector('.pair-discovery-key')
@@ -449,7 +395,6 @@ document.getElementById('pair-button').addEventListener('click', async (e) => {
       timerInterval = setInterval(() => {
         timer.textContent = `${Swal.getTimerLeft() / 1000}`
       }, 100)
-      console.log(pearwords.pairable)
     },
     willClose: () => {
       // Pairing Session Ended by Closing Pop up

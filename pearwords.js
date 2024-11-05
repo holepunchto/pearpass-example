@@ -9,17 +9,23 @@ import ProtomuxRPC from 'protomux-rpc'
 import b4a from 'b4a'
 
 class Pearwords extends ReadyResource {
-  constructor (corestore, key) {
+  constructor (data) {
     super()
-    this.corestore = corestore
+    this.corestore = data.coreStore
     // Create new Hyperswarm to replicate
     this.swarm = null
     // Initialise a RPC to it later
     this.rpc = null
     // Set pairable to false
     this.pairable = false
+    // Encryption key
+    let encryptionKey
+    if (data.encryptionKey) {
+      encryptionKey = Buffer.from(data.encryptionKey, 'hex')
+    }
     // Initialise the base
-    this.base = new Autobase(corestore, key, {
+    this.base = new Autobase(data.coreStore, data.bootstrapKey, {
+      encryptionKey: encryptionKey,
       valueEncoding: 'json',
       open (store) {
         return new Hyperbee(store.get('view'), {
@@ -83,6 +89,15 @@ class Pearwords extends ReadyResource {
   // Find peers in Hyperswarm using this
   discoveryKey () {
     return this.base.discoveryKey
+  }
+
+  // Encryption key for the base
+  encryptionKey () {
+    if (this.base.encryptionKey) {
+      return this.base.encryptionKey
+    } else {
+      return Buffer.from('null', 'hex')
+    }
   }
 
   // Get data of all indexes in the base
@@ -151,7 +166,8 @@ class Pearwords extends ReadyResource {
           } catch (e) {
             console.log('Error adding writer:', e)
           }
-          return Buffer.from(this.bootstrapKey())
+          const data = b4a.toString(this.bootstrapKey(), 'hex') + b4a.toString(this.encryptionKey(), 'hex')
+          return Buffer.from(data, 'hex')
         } else {
           console.log('Pairing not enabled')
         }
