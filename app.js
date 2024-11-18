@@ -9,6 +9,7 @@ import ProtomuxRPC from 'protomux-rpc'
 import libKeys from 'hyper-cmd-lib-keys'
 import b4a from 'b4a'
 import fs from 'fs'
+
 // For pop-ups
 import Swal from 'sweetalert2'
 
@@ -20,13 +21,13 @@ const baseDir = Pear.config.storage + '/store'
 
 // Initialise global variables here
 let pearwords
-let coreStore
+let corestore
 let discoveryKey
 
 /// // Function Definitions // ///
 
 async function initCoreStore () {
-  coreStore = new Corestore(baseDir)
+  corestore = new Corestore(baseDir)
 }
 
 // Create an autobase if one does not exist already
@@ -36,11 +37,8 @@ async function createBase () {
   // Don't create the base if already exists
   if (fs.existsSync(baseDir)) {
     initCoreStore()
-    pearwords = new Pearwords({ coreStore: coreStore })
-    console.log('Base exists')
+    pearwords = new Pearwords({ corestore })
   } else {
-    console.log('Base does not exist, prompt user to create a new one')
-
     const result = await Swal.fire({
       title: 'No Vault found',
       showDenyButton: true,
@@ -58,7 +56,7 @@ async function createBase () {
     // Logic for creating a new vault
     if (result.isConfirmed) {
       initCoreStore()
-      pearwords = new Pearwords({ coreStore: coreStore, encryptionKey: randomBytes() })
+      pearwords = new Pearwords({ corestore, encryptionKey: randomBytes() })
       await Swal.fire('New vault created!', '', 'success')
       createTable()
     } else if (result.isDenied) {
@@ -87,7 +85,7 @@ async function createBase () {
           }
           // Load a temporary Hyperswarm
           const swarm = new Hyperswarm({
-            keyPair: await coreStore.createKeyPair('hyperswarm')
+            keyPair: await corestore.createKeyPair('hyperswarm')
           })
 
           // Join swarm over discovery key
@@ -97,18 +95,17 @@ async function createBase () {
           // Create a promise that resolves when a connection is established
           const connectionPromise = new Promise((resolve, reject) => {
             swarm.on('connection', async (connection, peerInfo) => {
-              console.log('Joined swarm')
               const rpc = new ProtomuxRPC(connection)
               // Key of the corestore
-              const coreKey = await Pearwords.coreKey(coreStore)
+              const coreKey = await Pearwords.coreKey(corestore)
               // Secret key from the pairing key
               const secretKey = Buffer.from(value.slice(0, 64), 'hex')
-              console.log('Requesting to pair')
+
               let writerReq = await rpc.request(
-                'addMe',
+                'add-me',
                 Buffer.concat([secretKey, coreKey])
               )
-              console.log('RPC requested')
+
               if (writerReq) {
                 writerReq = b4a.toString(writerReq, 'hex')
                 // Store RPC answer
@@ -132,7 +129,7 @@ async function createBase () {
         preConfirm: async (vaultKey) => {
           // Initialise Pearwords
           try {
-            pearwords = new Pearwords({ coreStore: coreStore, bootstrapKey: bootstrapKey, encryptionKey: remoteEncryptionKey })
+            pearwords = new Pearwords({ corestore, bootstrapKey, encryptionKey: remoteEncryptionKey })
           } catch (error) {
             Swal.showValidationMessage(`Error: ${error}`)
           }
@@ -155,7 +152,7 @@ async function createBase () {
   await pearwords.ready()
   // Set pairable state to false
   pearwords.pairable = false
-  console.log('Ready to use pearwords')
+
   // Begin replicating to/from
   await pearwords.replicate()
   // Set the Add writer button
@@ -165,7 +162,6 @@ async function createBase () {
     document.querySelector('.add-writer').innerHTML = 'Syncing..'
   }
   discoveryKey = b4a.toString(await pearwords.discoveryKey(), 'hex')
-  console.log('Replication started')
 }
 
 // Push data to the html table
@@ -228,7 +224,6 @@ async function createTable () {
       push(data.value[0], { title: data.value[1], note: data.value[2] })
     }
   }
-  console.log('Created table')
 }
 
 // Copy data to clipboard
@@ -258,7 +253,6 @@ pearwords.base.view.core.on('append', (e) => {
 
 // Check for base writable state
 pearwords.base.on('writable', (e) => {
-  console.log('I am writable')
   document.querySelector('.add-writer').innerHTML = 'Writable'
   document.querySelector('.add-writer').removeAttribute('disabled')
 })
@@ -275,13 +269,8 @@ document.querySelector('.destroy-session').addEventListener('click', (e) => {
   ) {
     if (fs.existsSync(baseDir)) {
       fs.rmSync(baseDir, { recursive: true, force: true })
-      console.log('Destroying Base')
       createBase()
-    } else {
-      console.error('Base does not exist')
     }
-  } else {
-    console.log('Destroy dialogue cancelled')
   }
 })
 
@@ -400,13 +389,11 @@ document.getElementById('pair-button').addEventListener('click', async (e) => {
       // Pairing Session Ended by Closing Pop up
       pearwords.pairable = false
       clearInterval(timerInterval)
-      console.log('Pairing session ended by user')
     }
   }).then((result) => {
     // Pairing closed by timer
     if (result.dismiss === Swal.DismissReason.timer) {
       pearwords.pairable = false
-      console.log('Pairing session ended by Timer')
     }
   })
 })

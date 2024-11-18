@@ -5,27 +5,23 @@ import Hyperbee from 'hyperbee'
 import Hyperswarm from 'hyperswarm'
 import ReadyResource from 'ready-resource'
 import ProtomuxRPC from 'protomux-rpc'
-
+import { encode, decode, normalize } from 'hypercore-id-encoding'
 import b4a from 'b4a'
 
 class Pearwords extends ReadyResource {
-  constructor (data) {
+  constructor (opts) {
     super()
-    this.corestore = data.coreStore
-    // Create new Hyperswarm to replicate
+    this.corestore = opts.corestore
     this.swarm = null
-    // Initialise a RPC to it later
     this.rpc = null
-    // Set pairable to false
     this.pairable = false
-    // Encryption key
     let encryptionKey
-    if (data.encryptionKey) {
-      encryptionKey = Buffer.from(data.encryptionKey, 'hex')
+    if (opts.encryptionKey) {
+      encryptionKey = decode(opts.encryptionKey)
     }
     // Initialise the base
-    this.base = new Autobase(data.coreStore, data.bootstrapKey, {
-      encryptionKey: encryptionKey,
+    this.base = new Autobase(opts.corestore, opts.bootstrapKey, {
+      encryptionKey,
       valueEncoding: 'json',
       open (store) {
         return new Hyperbee(store.get('view'), {
@@ -41,6 +37,8 @@ class Pearwords extends ReadyResource {
           // Add support for adding other peers as a writer to the base
           if (op.type === 'addWriter') {
             await base.addWriter(b4a.from(op.key, 'hex'))
+          } else if (op.type === 'removeWriter') {
+            await base.removeWriter(b4a.from(op.key, 'hex'))
           } else if (op.type === 'addRecord') {
             // This adds a new record
             await view.put(op.key, op.value)
@@ -93,11 +91,7 @@ class Pearwords extends ReadyResource {
 
   // Encryption key for the base
   encryptionKey () {
-    if (this.base.encryptionKey) {
-      return this.base.encryptionKey
-    } else {
-      return Buffer.from('null', 'hex')
-    }
+    return this.base.encryptionKey
   }
 
   // Get data of all indexes in the base
@@ -114,20 +108,21 @@ class Pearwords extends ReadyResource {
 
   // Add a peer as a writer
   async addWriter (key) {
-    try {
-      await this.base.append({
-        type: 'addWriter',
-        key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
-      })
-    } catch (error) {
-      throw error
-    }
+    await this.base.append({
+      type: 'addWriter',
+      key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
+    })
 
     return true
   }
 
   // To later add removeWriter
-  async removeWriter (key) {}
+  async removeWriter (key) {
+    await this.base.append({
+      type: 'removeWriter',
+      key: b4a.isBuffer(key) ? b4a.toString(key, 'hex') : key
+    })
+  }
 
   // Check if the base is writable
   isWritable () {
@@ -144,32 +139,23 @@ class Pearwords extends ReadyResource {
     const discovery = this.swarm.join(this.discoveryKey())
 
     // Listen for connections
-    this.swarm.on('connection', async (connection, peerInfo) => {
-      console.log('Received connection')
+    this.swarm.on('connection', (connection, peerInfo) => {
       // Replicate the base
       this.base.replicate(connection)
       // Setup a RPC on this connection
       this.rpc = new ProtomuxRPC(connection)
 
       // Handle pairing
-      this.rpc.respond('addMe', (req) => {
-        console.log('Received a verification request')
+      this.rpc.respond('add-me', async (req) => {
         // First 64 characters are randomly generated secret key, set in this.pairable
         // Latter 64 characters are coreKey of the remote base that we need to add as a writer
         const pairingSecret = b4a.toString(req, 'hex').slice(0, 64)
         const remoteKey = b4a.toString(req, 'hex').slice(-64)
         // Go for verification only if pairing is enabled
-        console.log('Verifying peer')
         if (this.pairable !== false && this.pairable === pairingSecret) {
-          try {
-            this.addWriter(remoteKey)
-          } catch (e) {
-            console.log('Error adding writer:', e)
-          }
+          await this.addWriter(remoteKey)
           const data = b4a.toString(this.bootstrapKey(), 'hex') + b4a.toString(this.encryptionKey(), 'hex')
           return Buffer.from(data, 'hex')
-        } else {
-          console.log('Pairing not enabled')
         }
       })
     })
@@ -194,5 +180,4 @@ class Pearwords extends ReadyResource {
   }
 }
 
-// module.exports = Pearwords;
 export default Pearwords
