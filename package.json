@@ -23,7 +23,6 @@
   ],
   "scripts": {
     "dev": "pear run -d .",
-    "dev2": "pear run -s /Users/supersu/test -d .",
     "test": "brittle test/*.test.js",
     "fix": "standard --fix"
   },
