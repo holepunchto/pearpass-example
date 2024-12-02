@@ -5,22 +5,34 @@ import Hyperbee from 'hyperbee'
 import Hyperswarm from 'hyperswarm'
 import ReadyResource from 'ready-resource'
 import ProtomuxRPC from 'protomux-rpc'
-import { encode, decode, normalize } from 'hypercore-id-encoding'
+import { decode } from 'hypercore-id-encoding'
 import b4a from 'b4a'
 
 class Pearwords extends ReadyResource {
-  constructor (opts) {
+  constructor (corestore, swarmkey) {
     super()
-    this.corestore = opts.corestore
-    this.swarm = null
+    this.corestore = corestore
     this.rpc = null
     this.pairable = false
-    let encryptionKey
-    if (opts.encryptionKey) {
-      encryptionKey = decode(opts.encryptionKey)
+
+    this.swarm = new Hyperswarm({
+      // keyPair: this.corestore.createKeyPair('hyperswarm')
+    })
+    // Join swarm over discovery key
+    if (swarmkey) {
+      this.swarm.join(swarmkey)
     }
-    // Initialise the base
-    this.base = new Autobase(opts.corestore, opts.bootstrapKey, {
+  }
+
+  // Initialize autobase
+  async initialize (opts) {
+    let encryptionKey
+    let bootstrapKey
+    if (opts) {
+      encryptionKey = decode(opts.encryptionKey)
+      bootstrapKey = opts.bootstrapKey
+    }
+    this.base = new Autobase(this.corestore, bootstrapKey, {
       encryptionKey,
       valueEncoding: 'json',
       open (store) {
@@ -49,6 +61,10 @@ class Pearwords extends ReadyResource {
         }
       }
     })
+    await this.ready()
+    if (!this.swarm.status(this.discoveryKey())) {
+      this.swarm.join(this.discoveryKey())
+    }
   }
 
   // Check if base is ready
@@ -132,12 +148,6 @@ class Pearwords extends ReadyResource {
   // Start Replicating the base across peers
   async replicate () {
     await this.ready()
-    this.swarm = new Hyperswarm({
-      keyPair: await this.corestore.createKeyPair('hyperswarm')
-    })
-    // Join swarm over discovery key
-    const discovery = this.swarm.join(this.discoveryKey())
-
     // Listen for connections
     this.swarm.on('connection', (connection, peerInfo) => {
       // Replicate the base
@@ -178,6 +188,15 @@ class Pearwords extends ReadyResource {
       value: null
     })
   }
-}
+
+  // Pairing key
+  async pairingKey () {
+    if (this.pairable) {
+      return this.pairable + b4a.toString(await this.discoveryKey(), 'hex')
+    }
+
+    return null
+  }
+} // end class
 
 export default Pearwords

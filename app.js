@@ -3,7 +3,6 @@
 
 // Import necessary modules
 import Corestore from 'corestore'
-import Hyperswarm from 'hyperswarm'
 import Pearwords from './pearwords.js'
 import ProtomuxRPC from 'protomux-rpc'
 import libKeys from 'hyper-cmd-lib-keys'
@@ -13,22 +12,15 @@ import fs from 'fs'
 // For pop-ups
 import Swal from 'sweetalert2'
 
-// Pear.updates(() => Pear.reload())
 Pear.teardown(() => pearwords._close())
 
 // Path to store autobase
 const baseDir = Pear.config.storage + '/store'
-
 // Initialise global variables here
 let pearwords
 let corestore
-let discoveryKey
 
 /// // Function Definitions // ///
-
-async function initCoreStore () {
-  corestore = new Corestore(baseDir)
-}
 
 // Create an autobase if one does not exist already
 async function createBase () {
@@ -36,8 +28,9 @@ async function createBase () {
   let remoteEncryptionKey = null
   // Don't create the base if already exists
   if (fs.existsSync(baseDir)) {
-    initCoreStore()
-    pearwords = new Pearwords({ corestore })
+    corestore = await new Corestore(baseDir)
+    pearwords = new Pearwords(corestore)
+    await pearwords.initialize()
   } else {
     const result = await Swal.fire({
       title: 'No Vault found',
@@ -55,13 +48,14 @@ async function createBase () {
 
     // Logic for creating a new vault
     if (result.isConfirmed) {
-      initCoreStore()
-      pearwords = new Pearwords({ corestore, encryptionKey: randomBytes() })
+      corestore = await new Corestore(baseDir)
+      pearwords = new Pearwords(corestore)
+      await pearwords.initialize({ encryptionKey: randomBytes() })
       await Swal.fire('New vault created!', '', 'success')
       createTable()
     } else if (result.isDenied) {
       // Load an existing vault
-      await initCoreStore()
+      corestore = await new Corestore(baseDir)
       const vaultKeyResult = await Swal.fire({
         title: 'Enter Your Vault Key',
         input: 'text',
@@ -83,18 +77,12 @@ async function createBase () {
           } else if (value.length !== 128) {
             return 'Key is not of proper length'
           }
-          // Load a temporary Hyperswarm
-          const swarm = new Hyperswarm({
-            keyPair: await corestore.createKeyPair('hyperswarm')
-          })
-
           // Join swarm over discovery key
-          const key = Buffer.from(value.slice(-64), 'hex')
-          const discovery = swarm.join(key)
-
+          const swarmkey = Buffer.from(value.slice(-64), 'hex')
+          pearwords = new Pearwords(corestore, swarmkey)
           // Create a promise that resolves when a connection is established
           const connectionPromise = new Promise((resolve, reject) => {
-            swarm.on('connection', async (connection, peerInfo) => {
+            pearwords.swarm.on('connection', async (connection, peerInfo) => {
               const rpc = new ProtomuxRPC(connection)
               // Key of the corestore
               const coreKey = await Pearwords.coreKey(corestore)
@@ -129,7 +117,7 @@ async function createBase () {
         preConfirm: async (vaultKey) => {
           // Initialise Pearwords
           try {
-            pearwords = new Pearwords({ corestore, bootstrapKey, encryptionKey: remoteEncryptionKey })
+            await pearwords.initialize({ bootstrapKey, encryptionKey: remoteEncryptionKey })
           } catch (error) {
             Swal.showValidationMessage(`Error: ${error}`)
           }
@@ -161,7 +149,6 @@ async function createBase () {
   } else {
     document.querySelector('.add-writer').innerHTML = 'Syncing..'
   }
-  discoveryKey = b4a.toString(await pearwords.discoveryKey(), 'hex')
 }
 
 // Push data to the html table
@@ -374,12 +361,12 @@ document.getElementById('pair-button').addEventListener('click', async (e) => {
         .querySelector('.pair-discovery-key')
         .addEventListener('click', async (e) => {
           // Use the Clipboard API
-          await copy(pearwords.pairable + discoveryKey)
+          await copy(await pearwords.pairingKey())
           alert('Pairing key copied!')
         })
 
       const discovery = Swal.getPopup().querySelector('.session-link > p')
-      discovery.textContent = pearwords.pairable + discoveryKey
+      discovery.textContent = await pearwords.pairingKey()
       const timer = Swal.getPopup().querySelector('b')
       timerInterval = setInterval(() => {
         timer.textContent = `${Swal.getTimerLeft() / 1000}`
