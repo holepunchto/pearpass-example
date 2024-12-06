@@ -3,34 +3,20 @@
 
 // Import necessary modules
 import Corestore from 'corestore'
-import Pearwords from './pearwords.js'
-import ProtomuxRPC from 'protomux-rpc'
-import libKeys from 'hyper-cmd-lib-keys'
-import b4a from 'b4a'
+import Autopass from 'autopass'
 import fs from 'fs'
-
-// For pop-ups
 import Swal from 'sweetalert2'
-
-Pear.teardown(() => pearwords._close())
 
 // Path to store autobase
 const baseDir = Pear.config.storage + '/store'
-// Initialise global variables here
-let pearwords
-let corestore
-
-/// // Function Definitions // ///
+let autopass
 
 // Create an autobase if one does not exist already
 async function createBase () {
-  let bootstrapKey = null
-  let remoteEncryptionKey = null
   // Don't create the base if already exists
   if (fs.existsSync(baseDir)) {
-    corestore = await new Corestore(baseDir)
-    pearwords = new Pearwords(corestore)
-    await pearwords.initialize()
+    autopass = new Autopass(new Corestore(baseDir))
+    await autopass.ready()
   } else {
     const result = await Swal.fire({
       title: 'No Vault found',
@@ -48,14 +34,11 @@ async function createBase () {
 
     // Logic for creating a new vault
     if (result.isConfirmed) {
-      corestore = await new Corestore(baseDir)
-      pearwords = new Pearwords(corestore)
-      await pearwords.initialize({ encryptionKey: randomBytes() })
+      autopass = new Autopass(await new Corestore(baseDir))
       await Swal.fire('New vault created!', '', 'success')
       createTable()
     } else if (result.isDenied) {
       // Load an existing vault
-      corestore = await new Corestore(baseDir)
       const vaultKeyResult = await Swal.fire({
         title: 'Enter Your Vault Key',
         input: 'text',
@@ -70,54 +53,19 @@ async function createBase () {
         showCancelButton: true,
         confirmButtonText: 'Create',
         showLoaderOnConfirm: true,
-        inputValidator: async (value) => {
+        inputValidator: async (invite) => {
           // Combined key length with secret + discovery key is 128 characters
-          if (!value) {
+          if (!invite) {
             return 'Key can not be blank!'
-          } else if (value.length !== 128) {
+          } else if (invite.length !== 106) {
             return 'Key is not of proper length'
-          }
-          // Join swarm over discovery key
-          const swarmkey = Buffer.from(value.slice(-64), 'hex')
-          pearwords = new Pearwords(corestore, swarmkey)
-          // Create a promise that resolves when a connection is established
-          const connectionPromise = new Promise((resolve, reject) => {
-            pearwords.swarm.on('connection', async (connection, peerInfo) => {
-              const rpc = new ProtomuxRPC(connection)
-              // Key of the corestore
-              const coreKey = await Pearwords.coreKey(corestore)
-              // Secret key from the pairing key
-              const secretKey = Buffer.from(value.slice(0, 64), 'hex')
-
-              let writerReq = await rpc.request(
-                'add-me',
-                Buffer.concat([secretKey, coreKey])
-              )
-
-              if (writerReq) {
-                writerReq = b4a.toString(writerReq, 'hex')
-                // Store RPC answer
-                bootstrapKey = writerReq.substring(0, 64)
-                remoteEncryptionKey = writerReq.substring(64)
-                resolve(writerReq) // Resolve the promise with the writer request
-              } else {
-                reject('Unable to pair') // Reject the promise if verification fails
-              }
-            })
-          })
-
-          // Wait for the connection promise to resolve or reject
-          try {
-            await connectionPromise
-          } catch (error) {
-            return error // Return the error if the promise was rejected
           }
         },
 
-        preConfirm: async (vaultKey) => {
-          // Initialise Pearwords
+        preConfirm: async (invite) => {
           try {
-            await pearwords.initialize({ bootstrapKey, encryptionKey: remoteEncryptionKey })
+            const pair = Autopass.pair(new Corestore(baseDir), invite)
+            autopass = await pair.finished()
           } catch (error) {
             Swal.showValidationMessage(`Error: ${error}`)
           }
@@ -135,16 +83,10 @@ async function createBase () {
       }
     }
   }
+  await autopass.ready()
 
-  // Wait for pearwords to get ready
-  await pearwords.ready()
-  // Set pairable state to false
-  pearwords.pairable = false
-
-  // Begin replicating to/from
-  await pearwords.replicate()
   // Set the Add writer button
-  if (pearwords.isWritable() === true) {
+  if (autopass.writable === true) {
     document.querySelector('.add-writer').innerHTML = 'Writable'
   } else {
     document.querySelector('.add-writer').innerHTML = 'Syncing..'
@@ -200,7 +142,7 @@ function cleanTable () {
 // Show data from the base to frontend
 async function createTable () {
   cleanTable()
-  for await (const data of pearwords.list()) {
+  for await (const data of autopass.list()) {
     if (data.value[0] === 'password') {
       push(data.value[0], {
         username: data.value[1],
@@ -218,28 +160,16 @@ async function copy (data) {
   navigator.clipboard.writeText(data)
 }
 
-// Generate Random 32 bytes
-function randomBytes () {
-  return libKeys.randomBytes(32).toString('hex')
-}
-
-/// // Function Implementations /////
-
 // Call this to start base creation
 await createBase()
 
 // Create table when base first loads
-pearwords.base.on('update', (e) => {
-  createTable()
-})
-
-// Listen and add new passwords to the list
-pearwords.base.view.core.on('append', (e) => {
+autopass.on('update', (e) => {
   createTable()
 })
 
 // Check for base writable state
-pearwords.base.on('writable', (e) => {
+autopass.on('writable', (e) => {
   document.querySelector('.add-writer').innerHTML = 'Writable'
   document.querySelector('.add-writer').removeAttribute('disabled')
 })
@@ -314,7 +244,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         }
       })
       if (formValues) {
-        await pearwords.add(formValues[1], formValues)
+        await autopass.add(formValues[1], formValues)
         createTable()
       }
     } else {
@@ -337,7 +267,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         }
       })
       if (formValues) {
-        await pearwords.add(formValues[1], formValues)
+        await autopass.add(formValues[1], formValues)
         createTable()
       }
     }
@@ -348,39 +278,25 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
 document.getElementById('pair-button').addEventListener('click', async (e) => {
   let timerInterval
   Swal.fire({
-    title: 'Pairing is now on',
-    html: ' Remaining time <b></b> seconds.<div class="session-link"><p class="pair-discovery-key"> </p> <img src="assets/copy-icon.svg" /> </div> <b> </b>',
-    timer: 120000,
-    timerProgressBar: true,
+    title: 'Pairing is active',
+    html: '<div class="session-link"><p class="pair-discovery-key"> </p> <img src="assets/copy-icon.svg" /> </div> <b> </b>',
     didOpen: async () => {
       Swal.showLoading()
-      // Enable pairing
-      pearwords.pairable = randomBytes()
-      // Copy Pearwords key to the clipboard
       Swal.getPopup()
         .querySelector('.pair-discovery-key')
         .addEventListener('click', async (e) => {
           // Use the Clipboard API
-          await copy(await pearwords.pairingKey())
+          const inv = await autopass.createInvite()
+          await copy(inv)
           alert('Pairing key copied!')
         })
 
       const discovery = Swal.getPopup().querySelector('.session-link > p')
-      discovery.textContent = await pearwords.pairingKey()
-      const timer = Swal.getPopup().querySelector('b')
-      timerInterval = setInterval(() => {
-        timer.textContent = `${Swal.getTimerLeft() / 1000}`
-      }, 100)
+      discovery.textContent = await autopass.createInvite()
     },
     willClose: () => {
       // Pairing Session Ended by Closing Pop up
-      pearwords.pairable = false
       clearInterval(timerInterval)
-    }
-  }).then((result) => {
-    // Pairing closed by timer
-    if (result.dismiss === Swal.DismissReason.timer) {
-      pearwords.pairable = false
     }
   })
 })
