@@ -6,10 +6,13 @@ import Corestore from 'corestore'
 import Autopass from 'autopass'
 import fs from 'fs'
 import Swal from 'sweetalert2'
+const { teardown } = Pear
 
 // Path to store autobase
 const baseDir = Pear.config.storage + '/store'
 let autopass
+
+teardown(() => autopass.close())
 
 // Create an autobase if one does not exist already
 async function createBase () {
@@ -34,9 +37,10 @@ async function createBase () {
 
     // Logic for creating a new vault
     if (result.isConfirmed) {
-      autopass = new Autopass(await new Corestore(baseDir))
+      autopass = new Autopass(new Corestore(baseDir))
+      await autopass.ready()
       await Swal.fire('New vault created!', '', 'success')
-      createTable()
+      await cleanTable()
     } else if (result.isDenied) {
       // Load an existing vault
       const vaultKeyResult = await Swal.fire({
@@ -125,7 +129,7 @@ function push (type, data) {
 }
 
 // Clean the table of all records, will be used for re-rendering
-function cleanTable () {
+async function cleanTable () {
   const passwordTable = document.getElementById('passwordTable')
   const notesTable = document.getElementById('notesTable')
 
@@ -141,7 +145,7 @@ function cleanTable () {
 
 // Show data from the base to frontend
 async function createTable () {
-  cleanTable()
+  await cleanTable()
   for await (const data of autopass.list()) {
     if (data.value[0] === 'password') {
       push(data.value[0], {
@@ -163,9 +167,9 @@ async function copy (data) {
 // Call this to start base creation
 await createBase()
 
-// Create table when base first loads
-autopass.on('update', (e) => {
-  createTable()
+// Create table when base updates
+autopass.on('update', async (e) => {
+  await createTable()
 })
 
 // Check for base writable state
@@ -178,15 +182,16 @@ autopass.on('writable', (e) => {
 await createTable()
 
 // Logic for destroying the base
-document.querySelector('.destroy-session').addEventListener('click', (e) => {
+document.querySelector('.destroy-session').addEventListener('click', async (e) => {
   if (
     confirm(
       'You will lose complete access to this vault and your passwords. Continue?'
     )
   ) {
     if (fs.existsSync(baseDir)) {
+      await autopass.close()
       fs.rmSync(baseDir, { recursive: true, force: true })
-      createBase()
+      Pear.reload()
     }
   }
 })
@@ -245,7 +250,6 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
       })
       if (formValues) {
         await autopass.add(formValues[1], formValues)
-        createTable()
       }
     } else {
       // Pop up for adding a Note
@@ -268,7 +272,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
       })
       if (formValues) {
         await autopass.add(formValues[1], formValues)
-        createTable()
+        await createTable()
       }
     }
   }
@@ -276,7 +280,6 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
 
 // Pair button setup
 document.getElementById('pair-button').addEventListener('click', async (e) => {
-  let timerInterval
   Swal.fire({
     title: 'Pairing is active',
     html: '<div class="session-link"><p class="pair-discovery-key"> </p> <img src="assets/copy-icon.svg" /> </div> <b> </b>',
@@ -293,10 +296,6 @@ document.getElementById('pair-button').addEventListener('click', async (e) => {
 
       const discovery = Swal.getPopup().querySelector('.session-link > p')
       discovery.textContent = await autopass.createInvite()
-    },
-    willClose: () => {
-      // Pairing Session Ended by Closing Pop up
-      clearInterval(timerInterval)
     }
   })
 })
