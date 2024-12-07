@@ -6,18 +6,18 @@ import Corestore from 'corestore'
 import Autopass from 'autopass'
 import fs from 'fs'
 import Swal from 'sweetalert2'
+
 const { teardown } = Pear
 
 // Path to store autobase
 const baseDir = Pear.config.storage + '/store'
+const inviteFile = Pear.config.storage + '/.invite'
 let autopass
-
-teardown(() => autopass.close())
 
 // Create an autobase if one does not exist already
 async function createBase () {
   // Don't create the base if already exists
-  if (fs.existsSync(baseDir)) {
+  if (fs.existsSync(inviteFile)) {
     autopass = new Autopass(new Corestore(baseDir))
     await autopass.ready()
   } else {
@@ -40,6 +40,7 @@ async function createBase () {
       autopass = new Autopass(new Corestore(baseDir))
       await autopass.ready()
       await Swal.fire('New vault created!', '', 'success')
+      fs.writeFileSync(inviteFile, 'w')
       await cleanTable()
     } else if (result.isDenied) {
       // Load an existing vault
@@ -166,6 +167,7 @@ async function copy (data) {
 
 // Call this to start base creation
 await createBase()
+teardown(() => autopass.close())
 
 // Create table when base updates
 autopass.on('update', async (e) => {
@@ -191,6 +193,7 @@ document.querySelector('.destroy-session').addEventListener('click', async (e) =
     if (fs.existsSync(baseDir)) {
       await autopass.close()
       fs.rmSync(baseDir, { recursive: true, force: true })
+      fs.rmSync(inviteFile)
       Pear.reload()
     }
   }
@@ -272,7 +275,6 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
       })
       if (formValues) {
         await autopass.add(formValues[1], formValues)
-        await createTable()
       }
     }
   }
