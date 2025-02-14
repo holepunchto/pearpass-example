@@ -148,14 +148,15 @@ async function cleanTable () {
 async function createTable () {
   await cleanTable()
   for await (const data of autopass.list()) {
-    if (data.value[0] === 'password') {
-      push(data.value[0], {
-        username: data.value[1],
-        password: data.value[2],
-        website: data.value[3]
+    const value = JSON.parse(data.value)
+    if (value[0] === 'password') {
+      push(value[0], {
+        username: value[1],
+        password: value[2],
+        website: value[3]
       })
-    } else if (data.value[0] === 'note') {
-      push(data.value[0], { title: data.value[1], note: data.value[2] })
+    } else if (value[0] === 'note') {
+      push(value[0], { title: value[1], note: value[2] })
     }
   }
 }
@@ -252,7 +253,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         }
       })
       if (formValues) {
-        await autopass.add(formValues[1], formValues)
+        await autopass.add(formValues[1], JSON.stringify(formValues))
       }
     } else {
       // Pop up for adding a Note
@@ -274,7 +275,7 @@ document.querySelector('.add-data').addEventListener('click', async (e) => {
         }
       })
       if (formValues) {
-        await autopass.add(formValues[1], formValues)
+        await autopass.add(formValues[1], JSON.stringify(formValues))
       }
     }
   }
