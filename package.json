@@ -32,9 +32,9 @@
   },
   "homepage": "https://github.com/holepunchto/pearwords#readme",
   "dependencies": {
-    "autopass": "^2.0.0",
+    "autopass": "^2.1.0",
     "bare-fs": "^3.0.2",
-    "corestore": "^6.18.4",
+    "corestore": "^7.0.7",
     "sweetalert2": "^11.14.1"
   },
   "devDependencies": {
