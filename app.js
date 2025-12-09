@@ -10,8 +10,8 @@ import Swal from 'sweetalert2'
 const { teardown } = Pear
 
 // Path to store autobase
-const baseDir = Pear.config.storage + '/store'
-const inviteFile = Pear.config.storage + '/.invite'
+const baseDir = Pear.app.storage + '/store'
+const inviteFile = Pear.app.storage + '/.invite'
 let autopass
 
 // Create an autobase if one does not exist already
@@ -195,7 +195,7 @@ document.querySelector('.destroy-session').addEventListener('click', async (e) =
       await autopass.close()
       fs.rmSync(baseDir, { recursive: true, force: true })
       fs.rmSync(inviteFile)
-      Pear.reload()
+      location.reload()
     }
   }
 })
