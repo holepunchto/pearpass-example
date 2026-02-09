@@ -5,6 +5,7 @@
   "pear": {
     "name": "pearwords",
     "type": "desktop",
+    "pre": "pear-electron/pre",
     "gui": {
       "backgroundColor": "#1b1d29",
       "height": 808,
@@ -12,7 +13,6 @@
     }
   },
   "type": "module",
-  "main": "index.html",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/holepunchto/pearwords.git"
@@ -35,6 +35,8 @@
     "autopass": "^2.1.0",
     "bare-fs": "^3.0.2",
     "corestore": "^7.0.7",
+    "pear-bridge": "^1.2.4",
+    "pear-electron": "^1.7.25",
     "sweetalert2": "^11.14.1"
   },
   "devDependencies": {
